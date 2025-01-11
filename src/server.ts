@@ -1,240 +1,74 @@
-// Import dependencies
 import express, { Request, Response } from "express";
+import { EventHandler } from "./event";
+import { TicketService } from "./ticketService";
 
 const app = express();
 const PORT = 3000;
+const eventHandler = new EventHandler();
+const ticketService = new TicketService(eventHandler);
 
-// Middleware to parse JSON
 app.use(express.json());
 
-// Types
-interface Reservation {
-  name: string;
-  email: string;
-  seatNumber: number;
-  eventId: number;
-  eventDate: string;
-}
-
-interface Event {
-  id: number;
-  name: string;
-  eventDates: string[];
-  details: string;
-}
-
-type Reservations = Record<Event["id"], Record<string, Reservation[]>>;
-
-// In-memory storage
-const events: Record<Event["id"], Event> = {};
-const reservations: Reservations = {};
-
-// Utility function to generate seat numbers
-const generateSeatNumber = (eventId: number, eventDate: string): number => {
-  if (!reservations[eventId]) reservations[eventId] = {};
-  if (!reservations[eventId][eventDate]) reservations[eventId][eventDate] = [];
-  return reservations[eventId][eventDate].length + 1;
-};
-
-// Create Event API
+// Event APIs
 app.post("/events", (req: Request, res: Response) => {
-  const { id, name, eventDates, details }: Event = req.body;
-  if (!id || !name || !eventDates || !details) {
-    return res
+  const { name, eventDates, details } = req.body;
+  if (!name || !eventDates || !details) {
+    console.error("Invalid request data for creating event:", req.body);
+    res
       .status(400)
-      .json({ error: "Event ID, name, dates, and details are required." });
+      .json({ error: "Name, eventDates, and details are required." });
+    return;
   }
-
-  if (events[id]) {
-    return res
-      .status(400)
-      .json({ error: "Event with this ID already exists." });
-  }
-
-  events[id] = { id, name, eventDates, details };
-  res.json({ message: "Event created successfully!", event: events[id] });
+  const event = eventHandler.createEvent({ name, eventDates, details });
+  res.status(201).json(event);
 });
 
-// View All Events API
-app.get("/events", (_req: Request, res: Response) => {
-  res.json(Object.values(events));
+app.get("/events", (req: Request, res: Response) => {
+  const events = eventHandler.getAllEvents();
+  res.json(events);
 });
 
-// View Single Event API
 app.get("/events/:id", (req: Request, res: Response) => {
-  const eventId = Number(req.params.id);
-  const event = events[eventId];
-
-  if (!event) {
-    return res.status(404).json({ error: "Event not found." });
+  const eventId = parseInt(req.params.id, 10);
+  if (isNaN(eventId)) {
+    console.error("Invalid event ID in request:", req.params.id);
+    res.status(400).json({ error: "Invalid event ID." });
+    return;
   }
-
+  const event = eventHandler.getEvent(eventId);
+  if (!event) {
+    res.status(404).json({ error: "Event not found." });
+    return;
+  }
   res.json(event);
 });
 
-// Reserve Event Ticket API
-app.post("/reserve", (req: Request, res: Response) => {
-  const {
-    name,
-    email,
-    eventId,
-    eventDate,
-  }: { name: string; email: string; eventId: number; eventDate: string } =
-    req.body;
-  if (!name || !email || !eventId || !eventDate) {
-    return res
-      .status(400)
-      .json({ error: "Name, email, event ID, and event date are required." });
-  }
-
-  const event = events[eventId];
-  if (!event) {
-    return res.status(404).json({ error: "Event not found." });
-  }
-
-  if (!event.eventDates.includes(eventDate)) {
-    return res.status(400).json({ error: "Invalid event date." });
-  }
-
-  const seatNumber = generateSeatNumber(eventId, eventDate);
-
-  // Check if the user already reserved a seat for the same event and date
-  const existingReservation = reservations[eventId][eventDate]?.find(
-    (attendee) => attendee.email === email
-  );
-  if (existingReservation) {
-    return res.status(400).json({
-      error: "You already have a reservation for this event on this date.",
-    });
-  }
-
-  const reservation: Reservation = {
-    name,
-    email,
-    seatNumber,
-    eventId,
-    eventDate,
-  };
-  reservations[eventId][eventDate].push(reservation);
-
-  res.json({
-    message: "Reservation successful!",
-    eventId,
-    eventDate,
-    seatNumber,
-  });
+// Ticket APIs
+app.post("/tickets", (req: Request, res: Response) => {
+  console.log("Received request to reserve ticket:", req.body);
+  ticketService.reserveTicket(req, res);
 });
 
-// View Reserved Ticket Details API
-app.get("/ticket", (req: Request, res: Response) => {
-  const { email } = req.query;
-  if (!email || typeof email !== "string") {
-    return res.status(400).json({ error: "Email is required." });
-  }
-
-  const userReservations = Object.values(reservations)
-    .flatMap((dates) => Object.values(dates).flat())
-    .filter((r) => r.email === email);
-
-  if (userReservations.length === 0) {
-    return res
-      .status(404)
-      .json({ error: "No reservations found for this email." });
-  }
-
-  res.json(userReservations);
+app.get("/tickets", (req: Request, res: Response) => {
+  console.log("Received request to get ticket details for:", req.query);
+  ticketService.getTicketDetails(req, res);
 });
 
-// View All Attendees API
 app.get("/attendees", (req: Request, res: Response) => {
-  const { eventId, eventDate } = req.query;
-  const parsedEventId = Number(eventId);
-  if (isNaN(parsedEventId) || !eventDate || typeof eventDate !== "string") {
-    return res
-      .status(400)
-      .json({ error: "Valid event ID and event date are required." });
-  }
-
-  const attendees = reservations[parsedEventId]?.[eventDate];
-  if (!attendees || attendees.length === 0) {
-    return res
-      .status(404)
-      .json({ error: "No attendees found for this event on this date." });
-  }
-
-  res.json(attendees);
+  console.log("Received request to get all attendees for:", req.query);
+  ticketService.getAllAttendees(req, res);
 });
 
-// Cancel Reservation API
-app.delete("/cancel", (req: Request, res: Response) => {
-  const {
-    email,
-    eventId,
-    eventDate,
-  }: { email: string; eventId: number; eventDate: string } = req.body;
-  if (!email || !eventId || !eventDate) {
-    return res
-      .status(400)
-      .json({ error: "Email, event ID, and event date are required." });
-  }
-
-  const attendees = reservations[eventId]?.[eventDate];
-  if (!attendees) {
-    return res
-      .status(404)
-      .json({ error: "No reservations found for this event on this date." });
-  }
-
-  const index = attendees.findIndex((attendee) => attendee.email === email);
-  if (index === -1) {
-    return res.status(404).json({
-      error: "No reservation found for this email on the given event and date.",
-    });
-  }
-
-  attendees.splice(index, 1);
-  res.json({ message: "Reservation cancelled successfully." });
+app.delete("/tickets", (req: Request, res: Response) => {
+  console.log("Received request to cancel reservation:", req.body);
+  ticketService.cancelReservation(req, res);
 });
 
-// Modify Seat Reservation API
-app.put("/modify", (req: Request, res: Response) => {
-  const {
-    email,
-    eventId,
-    eventDate,
-  }: { email: string; eventId: number; eventDate: string } = req.body;
-  if (!email || !eventId || !eventDate) {
-    return res
-      .status(400)
-      .json({ error: "Email, event ID, and event date are required." });
-  }
-
-  const attendees = reservations[eventId]?.[eventDate];
-  if (!attendees) {
-    return res
-      .status(404)
-      .json({ error: "No reservations found for this event on this date." });
-  }
-
-  const reservation = attendees.find((attendee) => attendee.email === email);
-  if (!reservation) {
-    return res.status(404).json({
-      error: "No reservation found for this email on the given event and date.",
-    });
-  }
-
-  const newSeatNumber = generateSeatNumber(eventId, eventDate);
-  reservation.seatNumber = newSeatNumber;
-
-  res.json({
-    message: "Seat reservation modified successfully.",
-    eventId,
-    eventDate,
-    newSeatNumber,
-  });
+app.put("/tickets", (req: Request, res: Response) => {
+  console.log("Received request to modify reservation:", req.body);
+  ticketService.modifyReservation(req, res);
 });
 
-// Start the server
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
