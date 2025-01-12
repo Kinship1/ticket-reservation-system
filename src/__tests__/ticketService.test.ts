@@ -32,8 +32,12 @@ describe("TicketService", () => {
 
     expect(res.json).toHaveBeenCalledWith({
       message: "Reservation successful!",
-      eventId: 1,
-      eventDate: "2025-01-20",
+      event: {
+        eventId: 1,
+        name: "Music Concert",
+        eventDate: "2025-01-20",
+        details: "A grand music concert.",
+      },
       seatNumber: 1,
     });
   });
@@ -91,8 +95,12 @@ describe("TicketService", () => {
 
     expect(res.json).toHaveBeenCalledWith({
       message: "Reservation successful!",
-      eventId: 1,
-      eventDate: "2025-01-20",
+      event: {
+        eventId: 1,
+        name: "Music Concert",
+        eventDate: "2025-01-20",
+        details: "A grand music concert.",
+      },
       seatNumber: 1,
     });
   });
@@ -116,9 +124,11 @@ describe("TicketService", () => {
 
     expect(res.json).toHaveBeenCalledWith({
       message: "Seat reservation modified successfully.",
-      eventId: 1,
-      eventDate: "2025-01-20",
-      newSeatNumber: 2,
+      event: {
+        eventId: 1,
+        eventDate: "2025-01-20",
+      },
+      seatNumber: 2,
     });
   });
 

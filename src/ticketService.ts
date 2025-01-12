@@ -103,8 +103,12 @@ export class TicketService {
 
     res.json({
       message: "Reservation successful!",
-      eventId,
-      eventDate,
+      event: {
+        eventId: event.id,
+        name: event.name,
+        eventDate: eventDate,
+        details: event.details,
+      },
       seatNumber,
     });
   }
@@ -125,7 +129,22 @@ export class TicketService {
       return;
     }
 
-    res.json(userReservations);
+    const ticketDetailsWithEventDetails = userReservations.map((r) => {
+      const event = this.eventHandler.getEvent(r.eventId);
+      return {
+        name: r.name,
+        email: r.email,
+        seatNumber: r.seatNumber,
+        event: {
+          eventId: r.eventId,
+          name: event?.name,
+          eventDate: r.eventDate,
+          details: event?.details,
+        },
+      };
+    });
+
+    res.json(ticketDetailsWithEventDetails);
   }
 
   getAllAttendees(req: Request, res: Response): void {
@@ -228,9 +247,11 @@ export class TicketService {
 
     res.json({
       message: "Seat reservation modified successfully.",
-      eventId,
-      eventDate,
-      newSeatNumber,
+      event: {
+        eventId,
+        eventDate,
+      },
+      seatNumber: newSeatNumber,
     });
   }
 }

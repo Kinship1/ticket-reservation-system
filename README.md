@@ -107,8 +107,12 @@ This repository contains a TypeScript-based server application that provides API
          "name": string,
          "email": string,
          "seatNumber": number,
-         "eventId": number,
-         "eventDate": string
+         "event": {
+            "eventId": number,
+            "eventDate": string,
+            "name": string,
+            "details": string
+            }
        }
      ]
      ```
@@ -160,7 +164,11 @@ This repository contains a TypeScript-based server application that provides API
      ```json
      {
        "message": "Seat reservation modified successfully.",
-       "newSeatNumber": number
+       "event": {
+        "eventId": number,
+        "eventDate": string,
+       },
+       "seatNumber": number
      }
      ```
 
